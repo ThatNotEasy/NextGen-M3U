@@ -1,70 +1,79 @@
 import json
 import os
-from xml.etree.ElementTree import Element, SubElement, tostring
+import time
+from datetime import datetime
 from colorama import Fore, Style
 
-# Ensure 'playlist' directory exists
-os.makedirs("playlist", exist_ok=True)
+# Define output directories
+OUTPUT_DIR = "output"
+PLAYLIST_DIR = os.path.join(OUTPUT_DIR, "playlist")
+GENERATOR_DIR = os.path.join(OUTPUT_DIR, "generator")
 
-def generate_m3u(channels):
-    """Generate M3U Playlist with Widevine DRM support."""
-    m3u_content = "#EXTM3U\n"
-    for ch in channels:
-        drm_props = ""
-        if ch['drm'] == "Widevine" and ch.get('license_key'):
-            drm_props = (
-                f"#KODIPROP:inputstreamaddon=inputstream.adaptive\n"
-                f"#KODIPROP:inputstream.adaptive.license_type=clearkey\n"
-                f"#KODIPROP:inputstream.adaptive.license_key={ch['license_key']}\n"
+# Ensure directories exist
+os.makedirs(PLAYLIST_DIR, exist_ok=True)
+os.makedirs(GENERATOR_DIR, exist_ok=True)
+
+class PlaylistGenerator:
+    def __init__(self):
+        self.vod_file = os.path.join(GENERATOR_DIR, "vod.json")
+        self.channels_file = os.path.join(GENERATOR_DIR, "channels.json")
+
+    def generate_filename(self, base_name, extension):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return f"{base_name}_{timestamp}.{extension}"
+
+    def load_data(self, file):
+        if os.path.exists(file):
+            with open(file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return []
+
+    def save_json(self, data, filename):
+        file_path = os.path.join(GENERATOR_DIR, filename)
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+        print(Fore.GREEN + f"\n✅ JSON data saved as {file_path}" + Style.RESET_ALL)
+
+    def format_drm(self, item):
+        if item["drmType"] != "none" and item.get("contentKeys"):
+            drm_props = f"#KODIPROP:inputstream.adaptive.license_type={item['drmType'].lower()}\n"
+            drm_props += f"#KODIPROP:inputstream.adaptive.license_key={json.dumps(item['contentKeys'])}\n" if isinstance(item['contentKeys'], dict) else f"#KODIPROP:inputstream.adaptive.license_key={item['contentKeys']}\n"
+            return drm_props
+        return ""
+
+    def format_custom_headers(self, item):
+        headers = ""
+        if item.get("customHeaders"):
+            for key, value in item["customHeaders"].items():
+                headers += f'#EXTHTTP:{{"{key}":"{value}"}}\n'
+        return headers
+
+    def save_m3u_playlist(self, data, base_filename, is_vod=False):
+        filename = self.generate_filename(base_filename, "m3u")
+        file_path = os.path.join(PLAYLIST_DIR, filename)
+
+        m3u_content = "#EXTM3U\n"
+        for item in data:
+            drm_props = self.format_drm(item)
+            custom_headers = self.format_custom_headers(item)
+
+            m3u_content += (
+                f"\n#EXTINF:-1 tvg-name=\"{item['channelName' if not is_vod else 'vodTitle']}\" "
+                f"tvg-logo=\"{item['thumbnailUrl']}\" group-title=\"{item['groupName' if not is_vod else 'vodTitle']}\","
+                f"{item['channelName' if not is_vod else 'vodTitle']}\n"
+                f"{custom_headers}{drm_props}{item['manifestUrl']}\n"
             )
-        m3u_content += (
-            f"{drm_props}"
-            f"#EXTINF:-1 tvg-id=\"{ch['id']}\" tvg-name=\"{ch['name']}\" group-title=\"{ch['group']}\",{ch['name']}\n"
-            f"{ch['url']}\n"
-        )
-    return m3u_content
 
-def generate_tivimate_json(channels):
-    """Generate TiviMate JSON Playlist."""
-    tivimate_structure = {
-        "playlists": [
-            {
-                "name": "My IPTV Playlist",
-                "groups": sorted({ch['group'] for ch in channels}),
-                "channels": channels
-            }
-        ]
-    }
-    return json.dumps(tivimate_structure, indent=4)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(m3u_content)
+        print(Fore.GREEN + f"\n✅ M3U Playlist saved as {file_path}" + Style.RESET_ALL)
 
-def generate_xspf(channels):
-    """Generate XSPF Playlist."""
-    playlist = Element("playlist", version="1", xmlns="http://xspf.org/ns/0/")
-    tracklist = SubElement(playlist, "trackList")
-    
-    for ch in channels:
-        track = SubElement(tracklist, "track")
-        SubElement(track, "title").text = ch['name']
-        SubElement(track, "location").text = ch['url']
-        SubElement(track, "annotation").text = ch['group']
-        SubElement(track, "image").text = ch['thumbnail']
-    
-    return tostring(playlist, encoding='utf-8', method='xml').decode('utf-8')
+    def generate_vod_playlist(self, multiple=False):
+        vod_data = self.load_data(self.vod_file)
+        base_filename = "vod_multiple_playlist" if multiple else "vod_playlist"
+        self.save_m3u_playlist(vod_data, base_filename, is_vod=True)
 
-def save_playlist(option, channels):
-    """Save playlist based on user selection."""
-    playlist_types = {
-        "1": ("playlist.m3u", generate_m3u(channels)),
-        "2": ("playlist_tivimate.json", generate_tivimate_json(channels)),
-        "3": ("playlist.xspf", generate_xspf(channels))
-    }
-    
-    filename, content = playlist_types.get(option, (None, None))
-    
-    if filename:
-        filepath = os.path.join("playlist", filename)
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(content)
-        print(Fore.GREEN + f"\n✅ Playlist saved as {filepath}" + Style.RESET_ALL)
-    else:
-        print(Fore.RED + "❌ Invalid option! Could not save playlist." + Style.RESET_ALL)
+    def generate_channels_playlist(self, multiple=False):
+        channels_data = self.load_data(self.channels_file)
+        base_filename = "channels_multiple_playlist" if multiple else "channels_playlist"
+        self.save_m3u_playlist(channels_data, base_filename, is_vod=False)

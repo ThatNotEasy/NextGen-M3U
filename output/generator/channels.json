@@ -1,0 +1,29 @@
+[
+    {
+        "channelName": "MEOW",
+        "groupName": "MEOW",
+        "manifestUrl": "meow.my/manifest.mpd",
+        "thumbnailUrl": "meow.my/thumbnail.png",
+        "drmType": "clearkey",
+        "contentKeys": {
+            "12123123": "123123123",
+            "123123123": "234535353"
+        },
+        "customHeaders": null
+    },
+    {
+        "channelName": "MEOW",
+        "groupName": "MEOW",
+        "manifestUrl": "meow.my/manifest.mpd",
+        "thumbnailUrl": "meow.my/thumbnail.jpg",
+        "drmType": "clearkey",
+        "contentKeys": {
+            "12123123": "123123123",
+            "123123123": "234535353"
+        },
+        "customHeaders": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ3bXZlciI6Miwid21pZGZtdCI6ImFzY2lpIiwid21pZHR5cCI6MSwid21rZXl2ZXIiOjEsIndtaWRsZW4iOjUxMiwid21pZCI6Ik9URTNZV0l3Tm1ZdE5HVmxOaTAwTXprd0xUa3dZbUV0TVdNd09HRTVNbUZrTkdJeiIsIndtb3BpZCI6MzIsImV4cCI6MTczOTkwNDU5NiwiaWF0IjoxNzM5MzAwNTk2fQ.cUtgV8thOcbEV1ceX_JISzV3SZ21i7m-e4ukxLgVw6w"
+        }
+    }
+]
